@@ -20,33 +20,21 @@ WIN_HEIGHT = 512
 class Bird(pygame.sprite.Sprite):
     """Represents the bird controlled by the player.
 
-    The bird is the 'hero' of this game.  The player can make it climb
-    (ascend quickly), otherwise it sinks (descends more slowly).  It must
-    pass through the space in between pipes (for every pipe passed, one
-    point is scored); if it crashes into a pipe, the game ends.
+    The bird now follows the mouse/finger position vertically instead of using tap controls.
+    A slow mode can be toggled to make the game easier.
 
     Attributes:
     x: The bird's X coordinate.
     y: The bird's Y coordinate.
-    msec_to_climb: The number of milliseconds left to climb, where a
-        complete climb lasts Bird.CLIMB_DURATION milliseconds.
-
-    Constants:
-    WIDTH: The width, in pixels, of the bird's image.
-    HEIGHT: The height, in pixels, of the bird's image.
-    SINK_SPEED: With which speed, in pixels per millisecond, the bird
-        descends in one second while not climbing.
-    CLIMB_SPEED: With which speed, in pixels per millisecond, the bird
-        ascends in one second while climbing, on average.  See also the
-        Bird.update docstring.
-    CLIMB_DURATION: The number of milliseconds it takes the bird to
-        execute a complete climb.
+    target_y: The target Y position to move towards.
+    slow_mode: Boolean indicating if slow mode is active.
     """
 
     WIDTH = HEIGHT = 32
     SINK_SPEED = 0.18
     CLIMB_SPEED = 0.3
     CLIMB_DURATION = 333.3
+    FOLLOW_SPEED = 0.5  # Speed at which bird follows mouse/finger
 
     def __init__(self, x, y, msec_to_climb, images):
         """Initialise a new Bird instance.
@@ -65,33 +53,26 @@ class Bird(pygame.sprite.Sprite):
         """
         super(Bird, self).__init__()
         self.x, self.y = x, y
+        self.target_y = y
+        self.slow_mode = False
         self.msec_to_climb = msec_to_climb
         self._img_wingup, self._img_wingdown = images
         self._mask_wingup = pygame.mask.from_surface(self._img_wingup)
         self._mask_wingdown = pygame.mask.from_surface(self._img_wingdown)
 
     def update(self, delta_frames=1):
-        """Update the bird's position.
-
-        This function uses the cosine function to achieve a smooth climb:
-        In the first and last few frames, the bird climbs very little, in the
-        middle of the climb, it climbs a lot.
-        One complete climb lasts CLIMB_DURATION milliseconds, during which
-        the bird ascends with an average speed of CLIMB_SPEED px/ms.
-        This Bird's msec_to_climb attribute will automatically be
-        decreased accordingly if it was > 0 when this method was called.
-
-        Arguments:
-        delta_frames: The number of frames elapsed since this method was
-            last called.
-        """
-        if self.msec_to_climb > 0:
-            frac_climb_done = 1 - self.msec_to_climb/Bird.CLIMB_DURATION
-            self.y -= (Bird.CLIMB_SPEED * frames_to_msec(delta_frames) *
-                       (1 - math.cos(frac_climb_done * math.pi)))
-            self.msec_to_climb -= frames_to_msec(delta_frames)
-        else:
-            self.y += Bird.SINK_SPEED * frames_to_msec(delta_frames)
+        """Update the bird's position to follow the target position."""
+        # Calculate the speed based on slow mode
+        speed = Bird.FOLLOW_SPEED * (0.5 if self.slow_mode else 1.0)
+        
+        # Move towards target position
+        if self.y < self.target_y:
+            self.y += speed * frames_to_msec(delta_frames)
+        elif self.y > self.target_y:
+            self.y -= speed * frames_to_msec(delta_frames)
+        
+        # Ensure bird stays within screen bounds
+        self.y = max(0, min(self.y, WIN_HEIGHT - Bird.HEIGHT))
 
     @property
     def image(self):
@@ -333,6 +314,11 @@ def main():
     frame_clock = 0  # this counter is only incremented if the game isn't paused
     score = 0
     done = paused = False
+    
+    # Global animation speed for slow mode
+    global ANIMATION_SPEED
+    original_animation_speed = ANIMATION_SPEED
+
     while not done:
         clock.tick(FPS)
 
@@ -348,9 +334,13 @@ def main():
                 break
             elif e.type == KEYUP and e.key in (K_PAUSE, K_p):
                 paused = not paused
-            elif e.type == MOUSEBUTTONUP or (e.type == KEYUP and
-                    e.key in (K_UP, K_RETURN, K_SPACE)):
-                bird.msec_to_climb = Bird.CLIMB_DURATION
+            elif e.type == KEYUP and e.key == K_s:
+                # Toggle slow mode
+                bird.slow_mode = not bird.slow_mode
+                ANIMATION_SPEED = original_animation_speed * (0.5 if bird.slow_mode else 1.0)
+            elif e.type == MOUSEMOTION:
+                # Update bird's target position based on mouse
+                bird.target_y = e.pos[1] - Bird.HEIGHT/2
 
         if paused:
             continue  # don't draw anything
@@ -382,6 +372,11 @@ def main():
         score_surface = score_font.render(str(score), True, (255, 255, 255))
         score_x = WIN_WIDTH/2 - score_surface.get_width()/2
         display_surface.blit(score_surface, (score_x, PipePair.PIECE_HEIGHT))
+
+        # Display slow mode status
+        if bird.slow_mode:
+            slow_text = score_font.render("SLOW MODE", True, (255, 255, 255))
+            display_surface.blit(slow_text, (10, 10))
 
         pygame.display.flip()
         frame_clock += 1
