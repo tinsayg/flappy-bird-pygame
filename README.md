@@ -26,7 +26,7 @@ A modified version of Flappy Bird implemented in Pygame with new gameplay mechan
 - 'ESC' Key: Quit game
 
 ## Requirements
-- Python 3.x
+- Python 3
 - Pygame
 
 ## Installation
