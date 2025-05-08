@@ -53,4 +53,4 @@ A modified version of Flappy Bird implemented in Pygame with new gameplay mechan
 
 ## Credits
 Original game concept by Dong Nguyen
-Modified by [Your Name]
+Modified by CS470 Project Group
